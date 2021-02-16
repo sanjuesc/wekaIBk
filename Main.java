@@ -2,6 +2,12 @@ package ehu.weka;
 
 
 
+import java.io.File;
+import java.io.FileWriter;
+import java.io.PrintWriter;
+import java.io.StringWriter;
+import java.util.Random;
+
 import weka.classifiers.Evaluation;
 import weka.classifiers.lazy.IBk;
 import weka.core.ChebyshevDistance;
@@ -26,9 +32,10 @@ public class Main {
 			int maxi=0;
 			int maxj=0;
 			int maxz=0;
-			DataSource loader = new DataSource("balance-scale.arff");
+			DataSource loader = new DataSource(args[0]);
 			Instances data = loader.getDataSet();
-			Randomize randomize = new Randomize();
+			data.setClassIndex(data.numAttributes()-1);
+			/*Randomize randomize = new Randomize();
 			randomize.setSeed(941999);
 			randomize.setInputFormat(data);
 			Instances randomData = Filter.useFilter(data, randomize);
@@ -47,7 +54,9 @@ public class Main {
 			//Datuak
 			train.setClassIndex(train.numAttributes()-1);
 			test.setClassIndex(test.numAttributes()-1);
-
+			*/
+			System.out.println(data.classAttribute().numValues());
+			FileWriter fw = new FileWriter("errors.txt");
 			SelectedTag sim = new SelectedTag(IBk.WEIGHT_SIMILARITY, IBk.TAGS_WEIGHTING);
 			SelectedTag none = new SelectedTag(IBk.WEIGHT_NONE, IBk.TAGS_WEIGHTING);
 			SelectedTag inverse = new SelectedTag(IBk.WEIGHT_INVERSE, IBk.TAGS_WEIGHTING);
@@ -57,8 +66,8 @@ public class Main {
 			FilteredDistance filDistance = new FilteredDistance();
 			MinkowskiDistance minkDistance = new MinkowskiDistance();
 
-			for(int i = 1; i<train.numInstances()-1;i++) { //1-en hasten bagara 100 pctCorrect dago
-				for(int j = 2; j<6; j++) {
+			for(int i = 1; i<data.numInstances();i++) { 
+				for(int j = 1; j<6; j++) {
 					IBk ibk = new IBk();
 					ibk.setKNN(i);
 					switch(j) {
@@ -81,7 +90,6 @@ public class Main {
 			    		break;
 					}
 					for(int z= 1; z<4; z++) {
-						System.out.println("Caso actual i,j,z "+i+","+j+","+z);
 						switch(z) {
 						case 1:
 							ibk.setDistanceWeighting(inverse);
@@ -94,28 +102,33 @@ public class Main {
 							break;
 						default:
 				    		break;
+						}try {
+							Evaluation eval = new Evaluation(data);
+							eval.crossValidateModel(ibk, data, 10, new Random(1));
+							System.out.println("\nCaso actual i,j,z "+i+","+j+","+z);
+							if(eval.pctCorrect()>maxpct) {
+								maxpct=eval.pctCorrect();
+								maxi=i;
+								maxj=j;
+								maxz=z;
+							}
+							
+						}catch(Exception e) {
+							StringWriter sw = new StringWriter();
+							PrintWriter pw = new PrintWriter(sw);
+							e.printStackTrace(pw);
+							String sStackTrace = sw.toString(); 
+							fw.write("\nCaso actual i,j,z "+i+","+j+","+z);
+							fw.write(sStackTrace);
 						}
-						ibk.buildClassifier(train);
-						Evaluation eval = new Evaluation(train);
-						eval.evaluateModel(ibk, test);
-						if(eval.pctCorrect()>maxpct) {
-							maxpct=eval.pctCorrect();
-							maxi=i;
-							maxj=j;
-							maxz=z;
-						}
-						
-						if(i%25== 0 && j == 5 && z == 3) {
-							System.out.println("asu hoberenean pctCorrect " + maxpct + " izan da");
-							System.out.println("i = " + maxi + ", j = "+ maxj + ", z = "+ maxz);		 
-						}
+
 					}
 
 				}
 
 			}
 
-
+			fw.close();
 			System.out.println("Casu hoberenean pctCorrect " + maxpct + " izan da");
 			System.out.println("i = " + maxi + ", j = "+ maxj + ", z = "+ maxz);
 
